@@ -35,14 +35,14 @@ body{color:var(--paper);font-family:var(--font-body);font-size:21px;line-height:
 .screen{position:relative;width:100%;width:min(100cqw,100cqh * 16 / 9);aspect-ratio:16/9;overflow:hidden;background:#000}
 .screen canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:manipulation;cursor:pointer;outline:none}
 .screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(180deg,transparent 0 2px,rgba(0,0,0,.16) 2px 3px),radial-gradient(120% 100% at 50% 50%,transparent 62%,rgba(0,0,0,.5) 100%);box-shadow:inset 0 0 0 2px rgba(0,0,0,.8)}
-/* touch controls sit along the bottom edge: under the picture in portrait, over its bottom corners in landscape, never over the fighters in the middle */
-.pad{--d:148px;--b:76px;display:none;position:absolute;left:0;right:0;bottom:0;z-index:2;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+/* touch controls sit along the top edge, right under the button bar, where thumbs rest naturally: above the picture in portrait, over its top corners in landscape, never over the fighters in the middle */
+.pad{--d:148px;--b:76px;display:none;position:absolute;left:0;right:0;top:var(--bart,44px);z-index:2;align-items:flex-start;justify-content:space-between;gap:16px;padding:12px max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left));pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .pad.on{display:flex}
 .pad>*{pointer-events:auto}
-.stage.touch .view{padding-bottom:calc(var(--padh,180px) + 8px)}
+.stage.touch .view{padding-top:calc(var(--padh,180px) + 8px)}
 @media (orientation:landscape){
   .pad{--d:min(124px,30vh);--b:min(62px,15vh);opacity:.62}
-  .stage.touch .view{padding-bottom:0}
+  .stage.touch .view{padding-top:0}
 }
 .dpad{position:relative;width:var(--d);height:var(--d);flex:none;touch-action:none}
 .dpad span{position:absolute;background:var(--key);border:1px solid #403a48;pointer-events:none}
@@ -146,7 +146,7 @@ kbd{font-family:var(--font-display);font-size:11px;display:inline-block;min-widt
                 <tr><td>Guard</td><td>hold away, <kbd>S</kbd> for low</td><td>hold away, <kbd>↓</kbd> for low</td></tr>
               </tbody>
             </table>
-            <p class="note">New to kendo? Choose <b>Training</b> in the menu: fourteen short lessons with a partner, from footwork and distance to every cut and guard. On touch screens the pad at the bottom moves, the Men button works as <kbd>F</kbd> and the Do button as <kbd>G</kbd>.</p>
+            <p class="note">New to kendo? Choose <b>Training</b> in the menu: fourteen short lessons with a partner, from footwork and distance to every cut and guard. On touch screens the pad at the top moves, the Men button works as <kbd>F</kbd> and the Do button as <kbd>G</kbd>.</p>
             <p class="note">In single-player mode both key sets control Shiro, and Space also strikes. <kbd>Enter</kbd> starts, <kbd>P</kbd> or <kbd>Esc</kbd> pauses, <kbd>Q</kbd> in pause returns to the menu, <kbd>M</kbd> mutes the sound.</p>
           </div>
 
@@ -1610,8 +1610,9 @@ bSound.addEventListener('click',e=>{audioInit();toggleSound();refocus(e);});
 document.getElementById('bPause').addEventListener('click',e=>{if(canPause())S.paused=!S.paused;refocus(e);});
 document.getElementById('bMenu').addEventListener('click',e=>{closeHelp();toTitle();refocus(e);});
 const stage=document.getElementById('stage'),padEl=document.getElementById('pad'),bPad=document.getElementById('bPad');
-// in portrait the picture is centred in the space above the pad, so the pad's height is handed to the CSS
-function padFit(){stage.style.setProperty('--padh',padEl.offsetHeight+'px');}
+// the pad hangs right under the button bar; in portrait the picture is centred in the space below the pad, so both heights are handed to the CSS
+const barEl=document.querySelector('.bar');
+function padFit(){stage.style.setProperty('--bart',(barEl.offsetTop+barEl.offsetHeight)+'px');stage.style.setProperty('--padh',padEl.offsetHeight+'px');}
 function setPad(on){padEl.classList.toggle('on',on);stage.classList.toggle('touch',on);bPad.setAttribute('aria-pressed',String(on));padFit();}
 bPad.addEventListener('click',()=>setPad(!padEl.classList.contains('on')));
 addEventListener('resize',padFit);
