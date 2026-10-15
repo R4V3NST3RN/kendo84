@@ -50,13 +50,14 @@ body{color:var(--paper);font-family:var(--font-body);font-size:21px;line-height:
 .screen{position:relative;width:100%;width:min(100cqw,100cqh * 16 / 9);aspect-ratio:16/9;overflow:hidden;background:#000}
 .screen canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:manipulation;cursor:pointer;outline:none}
 .screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(180deg,transparent 0 2px,rgba(0,0,0,.16) 2px 3px),radial-gradient(120% 100% at 50% 50%,transparent 62%,rgba(0,0,0,.5) 100%);box-shadow:inset 0 0 0 2px rgba(0,0,0,.8)}
-/* touch controls never cover the fighters in the middle: in portrait the picture sits in the top third and the pad is centred in the bottom third; in landscape the pad hangs over the picture's top corners, right under the button bar */
+/* touch controls never cover the fighters in the middle: in portrait the picture is centred on the line one third down the screen and the pad on the line two thirds down; in landscape the pad hangs over the picture's top corners, right under the button bar */
 .pad{--d:148px;--b:76px;display:none;position:absolute;left:0;right:0;top:var(--bart,44px);z-index:2;align-items:flex-start;justify-content:space-between;gap:16px;padding:12px max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left));pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .pad.on{display:flex}
 .pad>*{pointer-events:auto}
 @media (orientation:portrait){
-  .pad{top:auto;bottom:0;min-height:33.4%;align-items:center;padding:12px max(14px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
-  .stage.touch .view{align-items:flex-start;padding-top:8px;padding-bottom:calc(var(--padh,240px) + 8px)}
+  .stage{--vh:100vh;--vh:100dvh}
+  .pad{top:66.67%;transform:translateY(-50%);align-items:center;padding:0 max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left))}
+  .stage.touch .view{align-items:flex-start;padding-top:max(8px,calc(var(--vh) / 3 - var(--bart,44px) - 100vw * 9 / 32));padding-bottom:calc(var(--vh) / 3 + var(--padh,180px) / 2 + 8px)}
 }
 @media (orientation:landscape){
   .pad{--d:min(124px,30vh);--b:min(62px,15vh);opacity:.62}
