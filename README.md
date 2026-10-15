@@ -24,7 +24,7 @@ Everything is in one HTML file: a 320×180 pixel-art canvas that fills the whole
 
 - In single-player mode both key sets control Shiro, and `Space` also strikes.
 - `Enter` starts the game. `P` or `Esc` pauses. `Q` in the pause menu returns to the menu. `M` mutes the sound.
-- **Touch screens**: d-pad plus **MEN** (works as `F`) and **DO** (works as `G`) buttons along the top edge of the screen, right under the button bar: above the picture in portrait and over its top corners in landscape. The game switches to fullscreen on the first tap where the browser allows it.
+- **Touch screens**: d-pad plus **MEN** (works as `F`) and **DO** (works as `G`) buttons. In portrait the picture sits in the top third of the screen and the controls in the bottom third; in landscape the controls sit over the picture's top corners. The game switches to fullscreen on the first tap where the browser allows it.
 
 ## Building from source
 

@@ -35,14 +35,16 @@ body{color:var(--paper);font-family:var(--font-body);font-size:21px;line-height:
 .screen{position:relative;width:100%;width:min(100cqw,100cqh * 16 / 9);aspect-ratio:16/9;overflow:hidden;background:#000}
 .screen canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:manipulation;cursor:pointer;outline:none}
 .screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(180deg,transparent 0 2px,rgba(0,0,0,.16) 2px 3px),radial-gradient(120% 100% at 50% 50%,transparent 62%,rgba(0,0,0,.5) 100%);box-shadow:inset 0 0 0 2px rgba(0,0,0,.8)}
-/* touch controls sit along the top edge, right under the button bar, where thumbs rest naturally: above the picture in portrait, over its top corners in landscape, never over the fighters in the middle */
+/* touch controls never cover the fighters in the middle: in portrait the picture sits in the top third and the pad is centred in the bottom third; in landscape the pad hangs over the picture's top corners, right under the button bar */
 .pad{--d:148px;--b:76px;display:none;position:absolute;left:0;right:0;top:var(--bart,44px);z-index:2;align-items:flex-start;justify-content:space-between;gap:16px;padding:12px max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left));pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .pad.on{display:flex}
 .pad>*{pointer-events:auto}
-.stage.touch .view{padding-top:calc(var(--padh,180px) + 8px)}
+@media (orientation:portrait){
+  .pad{top:auto;bottom:0;min-height:33.4%;align-items:center;padding:12px max(14px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+  .stage.touch .view{align-items:flex-start;padding-top:8px;padding-bottom:calc(var(--padh,240px) + 8px)}
+}
 @media (orientation:landscape){
   .pad{--d:min(124px,30vh);--b:min(62px,15vh);opacity:.62}
-  .stage.touch .view{padding-top:0}
 }
 .dpad{position:relative;width:var(--d);height:var(--d);flex:none;touch-action:none}
 .dpad span{position:absolute;background:var(--key);border:1px solid #403a48;pointer-events:none}
@@ -146,7 +148,7 @@ kbd{font-family:var(--font-display);font-size:11px;display:inline-block;min-widt
                 <tr><td>Guard</td><td>hold away, <kbd>S</kbd> for low</td><td>hold away, <kbd>↓</kbd> for low</td></tr>
               </tbody>
             </table>
-            <p class="note">New to kendo? Choose <b>Training</b> in the menu: fourteen short lessons with a partner, from footwork and distance to every cut and guard. On touch screens the pad at the top moves, the Men button works as <kbd>F</kbd> and the Do button as <kbd>G</kbd>.</p>
+            <p class="note">New to kendo? Choose <b>Training</b> in the menu: fourteen short lessons with a partner, from footwork and distance to every cut and guard. On touch screens the d-pad moves, the Men button works as <kbd>F</kbd> and the Do button as <kbd>G</kbd>.</p>
             <p class="note">In single-player mode both key sets control Shiro, and Space also strikes. <kbd>Enter</kbd> starts, <kbd>P</kbd> or <kbd>Esc</kbd> pauses, <kbd>Q</kbd> in pause returns to the menu, <kbd>M</kbd> mutes the sound.</p>
           </div>
 
@@ -189,6 +191,8 @@ kbd{font-family:var(--font-display);font-size:11px;display:inline-block;min-widt
 (()=>{'use strict';
 // ===== core =====
 const W=320,H=180,GY=152,D2R=Math.PI/180;
+// render interpolation: fighters are drawn between their last two simulation steps, so motion stays even on 90/120 Hz screens
+let TICK=0,RA=1;const IP=new Array(22);
 const START_A=118,START_B=202,EDGE=16;
 const cv=document.getElementById('game');
 const ctx=cv.getContext('2d',{alpha:false});
@@ -209,12 +213,24 @@ const GL={A:[14,17,17,31,17,17,17],B:[30,17,17,30,17,17,30],C:[14,17,16,16,16,17
 const ACC={'Á':'Aa','É':'Ea','Í':'Ia','Ó':'Oa','Ú':'Ua','Ý':'Ya','Č':'Cc','Ď':'Dc','Ě':'Ec','Ň':'Nc','Ř':'Rc','Š':'Sc','Ť':'Tc','Ž':'Zc','Ů':'Ur'};
 const MARK={a:[[3,-2],[2,-1]],c:[[1,-2],[3,-2],[2,-1]],r:[[2,-3],[1,-2],[3,-2],[2,-1]]};
 function textW(s,k=1){return Math.max(0,[...String(s)].length*6-1)*k;}
+// each solid-colour string is drawn once into a small sprite and then blitted: a screen of text costs a few drawImage calls instead of thousands of fillRects
+const TXC=new Map();
 function txt(s,x,y,col,k=1,al='l',shc){
   s=String(s).toUpperCase();const w=textW(s,k);
   if(al==='c')x-=Math.floor(w/2);else if(al==='r')x-=w;
   x=Math.round(x);y=Math.round(y);
-  if(shc)raw(s,x+k,y+k,shc,k);
-  raw(s,x,y,col,k);
+  if(typeof col==='function'||typeof shc==='function'){if(shc)raw(s,x+k,y+k,shc,k);raw(s,x,y,col,k);return;}
+  const key=s+'|'+col+'|'+k+'|'+(shc||'');
+  let sp=TXC.get(key);
+  if(!sp){
+    if(TXC.size>600)TXC.clear();
+    sp=document.createElement('canvas');sp.width=w+k+1;sp.height=11*k;
+    const keep=C;C=sp.getContext('2d');
+    if(shc)raw(s,k,3*k+k,shc,k);
+    raw(s,0,3*k,col,k);
+    C=keep;TXC.set(key,sp);
+  }
+  C.drawImage(sp,x,y-3*k);
 }
 function raw(s,x,y,col,k){
   const fn=typeof col==='function';
@@ -433,8 +449,11 @@ function swordOf(f,p,x,y){
   return{gx:x+f.facing*p[I.G],gy:GY-y+p[I.G+1],dx:f.facing*Math.cos(a),dy:Math.sin(a)};
 }
 
+function ipA(f){return f.tk===TICK&&f.rp?RA:1;}
+function ipX(f){const a=ipA(f);return a<1?f.rpX+(f.x-f.rpX)*a:f.x;}
 function drawFighter(f){
-  const p=f.cur,s=f.facing,bx=f.x,by=GY-f.y,pal=f.pal;
+  const a=ipA(f),p=a<1?(lerpP(f.rp,f.cur,a,IP),IP):f.cur;
+  const s=f.facing,bx=ipX(f),by=GY-(a<1?f.rpY+(f.y-f.rpY)*a:f.y),pal=f.pal;
   const bob=(f.st==='idle'&&!f.close)?(Math.floor(f.t/26)%2):0;
   const fl=f.flash>0&&(f.flash&2);
   const c=col=>fl?'#ffffff':col;
@@ -490,7 +509,7 @@ function drawFighter(f){
   C.fillStyle=c(ARM2);C.fillRect(Math.round(FH[0])-1,Math.round(FH[1])-2,2,1);
 }
 function shadow(f){
-  const w=Math.max(8,Math.round(24-f.y*0.45)),x=Math.round(f.x-w/2);
+  const w=Math.max(8,Math.round(24-f.y*0.45)),x=Math.round(ipX(f)-w/2);
   C.fillStyle='rgba(0,0,0,0.33)';C.fillRect(x,GY+1,w,2);C.fillRect(x+3,GY,w-6,1);C.fillRect(x+3,GY+3,w-6,1);
 }
 function drawTrail(f){
@@ -511,14 +530,25 @@ function flag(h,d,side,col){
   const b=[e[0]-d[0]*6,e[1]-d[1]*6];
   polyO([e,b,[b[0]+px*5,b[1]+py*5],[e[0]+px*5,e[1]+py*5]],col);
 }
+// a referee only changes with its flag mode (and the beat of the wave), so each look is drawn once into a sprite and reused
+const REFC=new Map();
 function drawRef(r,t){
-  const JK='#1f2747',TR='#74727d',cx=Math.round(r.x),gy=r.y,hip=gy-21,nk=hip-15,mode=r.mode;
+  const w=r.mode==='wave'?((Math.floor((t+r.x)/6)%2)?2:-2):0,key=r.mode+'|'+w;
+  let sp=REFC.get(key);
+  if(!sp){
+    sp=document.createElement('canvas');sp.width=72;sp.height=80;
+    const keep=C;C=sp.getContext('2d');drawRefAt(r.mode,w,36,74);C=keep;REFC.set(key,sp);
+  }
+  C.drawImage(sp,Math.round(r.x)-36,Math.round(r.y)-74);
+}
+function drawRefAt(mode,w,cx,gy){
+  const JK='#1f2747',TR='#74727d',hip=gy-21,nk=hip-15;
   let la=0.22,ra=0.22;
   if(mode==='W')la=2.3;else if(mode==='R')ra=2.3;else if(mode==='up')la=ra=2.95;else if(mode==='hajime')la=ra=1.4;
   const sL=[cx-5,nk+2],sR=[cx+5,nk+2];
   const hand=(s0,a,d)=>[s0[0]+d*Math.sin(a)*14,s0[1]+Math.cos(a)*14];
   let hL=hand(sL,la,-1),hR=hand(sR,ra,1),dL=[-Math.sin(la),Math.cos(la)],dR=[Math.sin(ra),Math.cos(ra)];
-  if(mode==='wave'){const w=(Math.floor((t+r.x)/6)%2)?2:-2;hL=[cx+2+w,nk+11];hR=[cx-2+w,nk+11];dL=[0.6,0.8];dR=[-0.6,0.8];}
+  if(mode==='wave'){hL=[cx+2+w,nk+11];hR=[cx-2+w,nk+11];dL=[0.6,0.8];dR=[-0.6,0.8];}
   else if(mode==='wakare'){hL=[cx+2,nk+6];hR=[cx-2,nk+6];dL=[0.6,-0.8];dR=[-0.6,-0.8];}
   const eL=[(sL[0]+hL[0])/2-1,(sL[1]+hL[1])/2+1],eR=[(sR[0]+hR[0])/2+1,(sR[1]+hR[1])/2+1];
   const sg=[[cx-3,hip,cx-4,gy-1,4,TR],[cx+3,hip,cx+4,gy-1,4,TR],[cx,hip+1,cx,nk+2,10,JK],[sL[0],sL[1],eL[0],eL[1],3,JK],[eL[0],eL[1],hL[0],hL[1],3,JK],[sR[0],sR[1],eR[0],eR[1],3,JK],[eR[0],eR[1],hR[0],hR[1],3,JK]];
@@ -577,7 +607,7 @@ class Fighter{
   }
   reset(x,f){
     Object.assign(this,{x,y:0,vx:0,facing:f,st:'idle',t:0,mv:null,mk:'',mt:0,slide:0,flash:0,walkPh:0,blockType:'high',buf:null,
-      custom:null,close:false,done:[],kaeshiT:0,kaeshiOf:null,kaeshiId:0,kaeshiMove:false,trail:[],prevX:x,prevY:0});
+      custom:null,close:false,done:[],kaeshiT:0,kaeshiOf:null,kaeshiId:0,kaeshiMove:false,trail:[],prevX:x,prevY:0,rp:null,tk:-1});
     this.cur=P.kamae.slice();this.prev=this.cur.slice();this.tgt=P.kamae;
   }
   set(st){if(this.st!==st){this.st=st;this.t=0;}}
@@ -608,7 +638,9 @@ class Fighter{
     this.set('idle');
   }
   update(opp,live){
-    this.t++;if(this.flash>0)this.flash--;if(this.kaeshiT>0)this.kaeshiT--;if(this.tellT>0)this.tellT--;
+    this.t++;if(this.flash>0)this.flash--;
+    if(this.rp&&this.tk===TICK-1){for(let i=0;i<NP;i++)this.rp[i]=this.cur[i];}else this.rp=this.cur.slice();
+    this.tk=TICK;this.rpX=this.x;this.rpY=this.y;if(this.kaeshiT>0)this.kaeshiT--;if(this.tellT>0)this.tellT--;
     this.prev=this.cur.slice();this.prevX=this.x;this.prevY=this.y;
     if(live&&opp&&this.canAct()){const d=opp.x-this.x;if(Math.abs(d)>2)this.facing=d>0?1:-1;}
     this.close=!!(live&&opp&&Math.abs(opp.x-this.x)<36);
@@ -1599,9 +1631,9 @@ function render(){
 let last=0,acc=0;const STEP=1000/60;
 function frame(now){
   acc+=Math.min(250,now-last);last=now;let n=0;
-  while(acc>=STEP&&n<5){update();pressed.clear();acc-=STEP;n++;}
+  while(acc>=STEP&&n<5){TICK++;update();pressed.clear();acc-=STEP;n++;}
   if(n===5)acc=0;
-  render();requestAnimationFrame(frame);
+  RA=acc/STEP;render();RA=1;requestAnimationFrame(frame);
 }
 
 // ===== page controls =====
@@ -1610,7 +1642,7 @@ bSound.addEventListener('click',e=>{audioInit();toggleSound();refocus(e);});
 document.getElementById('bPause').addEventListener('click',e=>{if(canPause())S.paused=!S.paused;refocus(e);});
 document.getElementById('bMenu').addEventListener('click',e=>{closeHelp();toTitle();refocus(e);});
 const stage=document.getElementById('stage'),padEl=document.getElementById('pad'),bPad=document.getElementById('bPad');
-// the pad hangs right under the button bar; in portrait the picture is centred in the space below the pad, so both heights are handed to the CSS
+// in landscape the pad hangs right under the button bar; in portrait the picture must stay clear of the pad: both sizes are handed to the CSS
 const barEl=document.querySelector('.bar');
 function padFit(){stage.style.setProperty('--bart',(barEl.offsetTop+barEl.offsetHeight)+'px');stage.style.setProperty('--padh',padEl.offsetHeight+'px');}
 function setPad(on){padEl.classList.toggle('on',on);stage.classList.toggle('touch',on);bPad.setAttribute('aria-pressed',String(on));padFit();}
